@@ -61,9 +61,11 @@
 
 ```bash
 # Download and extract
+mkdir -p /opt/neoserv
+cd /opt/neoserv
 wget https://your-download-link/neoserv-panel.zip
 unzip neoserv-panel.zip
-cd neoserv-panel
+cd neoserv
 
 # Run installer
 chmod +x install.sh
