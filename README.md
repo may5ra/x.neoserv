@@ -1,368 +1,375 @@
-# X NeoServ IPTV Panel
+# X NeoServ Control Panel v3.0
 
-## The Most Advanced IPTV Management Solution
+A modern, full-stack IPTV/streaming management dashboard with advanced security, load balancing, and comprehensive audit logging.
 
-**Support: Telegram @NEOSERV_ME**
+## Features
+
+- **User Management**: Full CRUD with ban/enable/disable, connection limits, playlist downloads (M3U/M3U Plus/Enigma2)
+- **Stream Management**: Live TV streams with real-time status, technical info (resolution, codecs, FPS, bitrate)
+- **VOD & Series**: Movies and TV series management with categories
+- **Bouquets**: Content packages for organized channel/VOD distribution
+- **Reseller System**: Credit-based reseller accounts with filtered access
+- **MAG Device Support**: Set-top box management with token security
+- **Load Balancer**: Custom proxy with source URL hiding, HLS rewriting, caching
+- **EPG Sources**: Electronic Program Guide management
+- **Audit Logging**: Complete activity tracking for all admin/reseller actions
+- **Security**: Rate limiting, IP whitelist/blacklist, connection enforcement
+- **Dark/Light Theme**: Modern UI inspired by Vercel/Linear design
 
 ---
 
-## Why X NeoServ is the BEST Choice
+## System Requirements
 
-### Security First
-- Stream source URLs are NEVER exposed to end users
-- Tokenized authentication with HMAC-SHA256 signatures
-- Rate limiting protection (30 req/min with auto-block)
-- IP whitelist/blacklist enforcement
-- Connection limit enforcement per user
-- Path traversal protection
-- No source URLs in browser network inspector
-
-### Lightning Fast Performance
-- Instant stream opening (under 1 second)
-- Optimized proxy buffering (512KB buffers)
-- 2-second connection timeout for fast failover
-- CDN-compatible with redirect following
-- Segment caching for instant replay
-
-### Complete Device Support
-- MAG/STB Emu (Stalker Portal API)
-- VLC Media Player
-- GSE Smart IPTV
-- Perfect Player
-- TiviMate
-- Enigma2/Dreambox
-- Any M3U/M3U8 compatible player
-
-### Professional Admin Features
-- Modern dashboard with real-time statistics
-- User management with expiration dates
-- Live TV stream management
-- VOD Movies library
-- TV Series with episodes
-- Category organization
-- Bouquet/Package system
-- Multi-server load balancing
-- EPG (TV Guide) management
-- Active connection monitoring
-- Admin/Reseller hierarchy
+- **OS**: Ubuntu 20.04/22.04/24.04 or Debian 11/12
+- **RAM**: Minimum 2GB (4GB recommended)
+- **Storage**: 20GB+ free space
+- **CPU**: 2+ cores recommended
+- **Ports**: 80 (default, configurable)
 
 ---
 
 ## Installation
 
-### Requirements
-- Ubuntu 20.04+ or Debian 11+
-- 2GB RAM minimum (4GB recommended)
-- 2 CPU cores minimum
-- 20GB disk space
-- Root access
+### Option 1: Automated Installation (Recommended)
 
-### One-Click Install
+The fastest way to get started. Run as root:
 
 ```bash
-# Download and extract
+# Create directory and download
 mkdir -p /opt/neoserv
 cd /opt/neoserv
-wget https://your-download-link/neoserv-panel.zip
+
+# Download panel package
+wget https://neoserv-panel.com/v2/neoserv-panel.zip
+
+# Extract and run installer
 unzip neoserv-panel.zip
-cd neoserv
-
-# Run installer
 chmod +x install.sh
-sudo ./install.sh
+sudo bash install.sh
 ```
 
-### Manual Installation
+The installer will prompt you for:
+1. **Database password** - Strong password for PostgreSQL
+2. **Admin password** - Password for the admin panel (username: `admin`)
+3. **Panel port** - Default is 80
 
-1. Install dependencies:
+After installation, access your panel at: `http://YOUR_SERVER_IP`
+
+---
+
+### Option 2: Manual Installation
+
+For those who prefer step-by-step control.
+
+#### Step 1: Install System Dependencies
+
 ```bash
-sudo apt update
-sudo apt install -y nodejs npm postgresql nginx
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install required packages
+sudo apt install -y curl wget unzip git postgresql postgresql-contrib
+
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+sudo apt install -y nodejs
+
+# Verify installation
+node -v  # Should show v20.x.x
+npm -v   # Should show 10.x.x
 ```
 
-2. Setup PostgreSQL:
+#### Step 2: Setup PostgreSQL Database
+
 ```bash
-sudo -u postgres createuser neoserv
-sudo -u postgres createdb neoserv_panel -O neoserv
+# Start PostgreSQL
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# Create database user and database
+sudo -u postgres psql -c "CREATE USER neoserv WITH ENCRYPTED PASSWORD 'YOUR_DB_PASSWORD';"
+sudo -u postgres psql -c "CREATE DATABASE neoserv_panel OWNER neoserv;"
+sudo -u postgres psql -d neoserv_panel -c "GRANT ALL ON SCHEMA public TO neoserv;"
 ```
 
-3. Configure environment:
+Replace `YOUR_DB_PASSWORD` with a strong password.
+
+#### Step 3: Download and Extract Panel
+
 ```bash
-cp .env.example .env
-# Edit .env with your database credentials
+# Create installation directory
+sudo mkdir -p /opt/neoserv
+cd /opt/neoserv
+
+# Download panel (or upload manually)
+wget -O neoserv-panel.zip https://neoserv-panel.com/v2/neoserv-panel.zip
+unzip neoserv-panel.zip
 ```
 
-4. Install and build:
+#### Step 4: Configure Environment
+
 ```bash
+# Generate session secret
+SESSION_SECRET=$(openssl rand -hex 32)
+
+# Create .env file
+cat > /opt/neoserv/.env <<EOF
+DATABASE_URL=postgresql://neoserv:YOUR_DB_PASSWORD@localhost:5432/neoserv_panel
+SESSION_SECRET=${SESSION_SECRET}
+NODE_ENV=production
+PORT=80
+ADMIN_PASSWORD=YOUR_ADMIN_PASSWORD
+EOF
+
+# Secure the file
+chmod 600 /opt/neoserv/.env
+```
+
+Replace:
+- `YOUR_DB_PASSWORD` with your PostgreSQL password
+- `YOUR_ADMIN_PASSWORD` with your desired admin panel password
+
+#### Step 5: Install Dependencies and Build
+
+```bash
+cd /opt/neoserv
+
+# Install Node.js packages
 npm install
+
+# Initialize database schema
+npm run db:push
+
+# Build the application
 npm run build
 ```
 
-5. Start server:
+#### Step 6: Create Systemd Service
+
 ```bash
-npm start
+# Create service file
+cat > /etc/systemd/system/neoserv.service <<EOF
+[Unit]
+Description=X NeoServ Panel
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/neoserv
+EnvironmentFile=/opt/neoserv/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable neoserv
+sudo systemctl start neoserv
 ```
 
----
-
-## Features Overview
-
-### Dashboard
-- Total users, streams, movies, series count
-- Active connections in real-time
-- Server status monitoring
-- Quick access to all sections
-
-### User Management
-- Create unlimited users
-- Set expiration dates
-- Connection limits
-- Bouquet assignments
-- Enable/Disable/Ban users
-- Kill active connections
-- Download playlists (M3U, M3U Plus, Enigma2)
-- Trial account support
-
-### Live TV Streams
-- Add unlimited channels
-- Assign categories
-- EPG channel mapping
-- Stream health monitoring
-- Start/Stop/Reload controls
-- Stream ordering
-- Resolution/codec info display
-
-### VOD Movies
-- Full movie library
-- Category organization
-- Movie metadata (year, rating, description)
-- Poster/cover images
-- Container format support
-
-### TV Series
-- Series with seasons
-- Episode management
-- Series metadata
-- Cover images
-- Episode ordering
-
-### Categories
-- Live TV categories
-- Movie categories
-- Series categories
-- Custom ordering
-
-### Bouquets (Packages)
-- Create content packages
-- Assign streams, movies, series
-- User-bouquet mapping
-- Package ordering
-- Content deduplication
-
-### Servers
-- Main server configuration
-- Load balancer support
-- Server health monitoring
-- SSH credentials storage
-- Server status display
-
-### EPG Sources
-- Multiple EPG sources
-- Auto-refresh scheduling
-- Channel mapping
-- XML/XMLTV support
-
-### Connections
-- Real-time active connections
-- User/Stream/IP tracking
-- Connection duration
-- Kill individual connections
-
-### Settings
-- General settings
-- Security configuration
-- Streaming options
-- Server settings
-- API compatibility
-- Transcoding options
-
-### Admin Management
-- Multiple admin accounts
-- Reseller accounts
-- Permission levels
-- Admin activity logging
-
-### MAG Device Support
-- Full Stalker Portal API
-- Device registration
-- MAC address management
-- STB Emu compatible
-
----
-
-## API Endpoints
-
-### Player API (XUI.ONE Compatible)
-- `GET /player_api.php` - Full player API
-- `GET /get.php` - Playlist generation
-- `GET /live/{user}/{pass}/{stream}.ts` - Live streams
-- `GET /movie/{user}/{pass}/{movie}.mp4` - VOD movies
-
-### Stalker Portal API (MAG Devices)
-- `POST /stalker_portal/server/load.php` - Portal API
-- Full STB authentication
-- Channel/VOD listings
-- EPG data
-
-### Admin API
-- Full REST API for all management functions
-- Token-based authentication
-- Rate limiting protection
-
----
-
-## Cloudflare Compatible
-
-X NeoServ supports dual-domain Cloudflare setup:
-
-- **Panel Domain** - Protected by Cloudflare (orange cloud proxy enabled)
-- **Streaming Domain** - DNS only (gray cloud, no proxy)
-
-This ensures:
-- Panel is protected from DDoS attacks
-- Streaming works without Cloudflare blocking video traffic
-- Server IP remains hidden behind Cloudflare
-
-Configure in Settings > Domains tab after installation.
-
----
-
-## Architecture
-
-### Hybrid Model
-- **Control Plane**: Panel handles authentication, user management, token generation
-- **Data Plane**: External Nginx proxy handles stream delivery for production performance
-
-### Security Flow
-1. User requests stream via playlist URL
-2. Nginx extracts token and signature
-3. Panel validates credentials via auth_request
-4. Panel returns source URL in header (never to client)
-5. Nginx proxies stream from source
-6. Client receives stream without seeing source
-
----
-
-## Auto-Restart Configuration
-
-The panel automatically restarts on server reboot via systemd:
+#### Step 7: Verify Installation
 
 ```bash
-# Service is enabled by default
-sudo systemctl enable neoserv
-
-# Manual control
-sudo systemctl start neoserv
-sudo systemctl stop neoserv
-sudo systemctl restart neoserv
+# Check service status
 sudo systemctl status neoserv
 
-# View logs
-sudo journalctl -u neoserv -f
+# View logs if needed
+journalctl -u neoserv -f
+```
+
+Access your panel at: `http://YOUR_SERVER_IP`
+- **Username**: admin
+- **Password**: (what you set in ADMIN_PASSWORD)
+
+---
+
+## Updating
+
+To update an existing installation:
+
+```bash
+cd /opt/neoserv
+
+# Upload new neoserv-panel-v3.0.zip to /opt/neoserv/
+# Then run:
+chmod +x UPDATE.sh
+sudo bash UPDATE.sh
+```
+
+Or manually:
+
+```bash
+cd /opt/neoserv
+
+# Stop service
+sudo systemctl stop neoserv
+
+# Backup .env
+cp .env .env.backup
+
+# Extract new files (will not overwrite .env)
+unzip -o neoserv-panel-v3.0.zip
+
+# Restore .env if needed
+cp .env.backup .env
+
+# Update dependencies and database
+npm install
+npm run db:push
+npm run build
+
+# Restart service
+sudo systemctl start neoserv
 ```
 
 ---
 
-## SSL Certificate
+## Useful Commands
 
-For production, always use HTTPS:
+| Command | Description |
+|---------|-------------|
+| `systemctl status neoserv` | Check panel status |
+| `systemctl restart neoserv` | Restart panel |
+| `systemctl stop neoserv` | Stop panel |
+| `systemctl start neoserv` | Start panel |
+| `journalctl -u neoserv -f` | View live logs |
+| `journalctl -u neoserv --since "1 hour ago"` | View recent logs |
+
+---
+
+## Configuration
+
+### Environment Variables
+
+Located in `/opt/neoserv/.env`:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SESSION_SECRET` | Secret for session encryption (auto-generated) |
+| `NODE_ENV` | Set to `production` |
+| `PORT` | Panel port (default: 80) |
+| `ADMIN_PASSWORD` | Initial admin password |
+
+### Changing Panel Port
+
+1. Edit `/opt/neoserv/.env` and change `PORT=80` to desired port
+2. Restart: `sudo systemctl restart neoserv`
+
+### Firewall Configuration
+
+If using UFW:
 
 ```bash
-sudo certbot --nginx -d yourdomain.com
+sudo ufw allow 80/tcp   # HTTP
+sudo ufw allow 443/tcp  # HTTPS (if using SSL)
+sudo ufw reload
 ```
 
 ---
 
-## Load Balancer Setup (True Resource Distribution)
+## Nginx Reverse Proxy (Optional)
 
-X NeoServ uses a **true load balancing architecture** where LB servers fetch streams directly from source URLs - properly distributing bandwidth, CPU, and RAM across multiple servers.
+If you want SSL/HTTPS with a domain, first change the panel port to 5000:
 
-### How It Works
-1. User requests stream from LB server
-2. LB server validates user with main panel (lightweight API call)
-3. LB server fetches HLS content **directly from source URL**
-4. Stream is served to user from LB server's bandwidth
-5. LB reports CPU/memory metrics to main panel every 30 seconds
-
-### Setup via Panel
-1. Go to **Servers** page in admin panel
-2. Add new server with SSH credentials (root access required)
-3. Set server type to "Load Balancer"
-4. Click **Install LB** button
-5. Panel automatically installs: Node.js 20, Nginx, LB Proxy service
-6. Server is ready to handle streams!
-
-### What Gets Installed on LB Server
-- Nginx (reverse proxy for HLS)
-- Node.js 20 (LB proxy script)
-- Custom proxy service (systemd managed)
-- Secure token authentication
-
-### Monitoring
-- Real-time CPU/Memory/Disk usage in Servers page
-- Active connections per LB server
-- Automatic failover if LB goes offline
-
----
-
-## Backup & Restore
-
-### Backup Database
 ```bash
-pg_dump neoserv_panel > backup.sql
+# Edit .env and set PORT=5000
+nano /opt/neoserv/.env
+sudo systemctl restart neoserv
 ```
 
-### Restore Database
+Then configure Nginx:
+
+```nginx
+server {
+    listen 80;
+    server_name panel.yourdomain.com;
+    
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Install SSL with Certbot:
+
 ```bash
-psql neoserv_panel < backup.sql
+sudo apt install nginx certbot python3-certbot-nginx
+sudo certbot --nginx -d panel.yourdomain.com
 ```
 
 ---
 
 ## Troubleshooting
 
-### Panel not starting
+### Panel won't start
+
 ```bash
-sudo journalctl -u neoserv -n 50
+# Check logs for errors
+journalctl -u neoserv -n 50 --no-pager
+
+# Verify database connection
+cd /opt/neoserv
+node -e "require('pg').Pool({connectionString: process.env.DATABASE_URL}).query('SELECT 1')"
+
+# Check if port is in use
+netstat -tlnp | grep 80
 ```
 
-### Database connection issues
+### Database connection failed
+
 ```bash
+# Verify PostgreSQL is running
 sudo systemctl status postgresql
+
+# Test connection manually
+psql -U neoserv -h localhost -d neoserv_panel
 ```
 
-### Nginx errors
+### Permission denied errors
+
 ```bash
-sudo nginx -t
-sudo tail -f /var/log/nginx/error.log
+# Ensure proper ownership
+sudo chown -R root:root /opt/neoserv
+chmod 600 /opt/neoserv/.env
+```
+
+---
+
+## Directory Structure
+
+```
+/opt/neoserv/
+├── .env                 # Environment configuration
+├── package.json         # Node.js dependencies
+├── dist/                # Compiled application
+│   └── index.js         # Main entry point
+├── client/              # Frontend source
+├── server/              # Backend source
+├── shared/              # Shared types/schemas
+├── install.sh           # Installation script
+└── UPDATE.sh            # Update script
 ```
 
 ---
 
 ## Support
 
-For all support inquiries:
-
-**Telegram: @NEOSERV_ME**
+For issues and feature requests, contact support or check the documentation.
 
 ---
 
-## License
-
-X NeoServ IPTV Panel - Professional IPTV Management Solution
-
-Copyright (c) 2025 NeoServ
-
----
-
-*Built with performance, security, and reliability in mind.*
+**X NeoServ v3.0** - Professional IPTV Management Made Simple
