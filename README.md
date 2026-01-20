@@ -382,8 +382,8 @@ For support, feature requests, or to purchase a license:
 
 ---
 
-**X NeoServ v3.0** - Developed by NeoServSolutions
+**X NeoServ v3.0** - Developed by NeoServ Solutions
 
 **DISCLAIMER**: This software is intended solely for managing legal IPTV content. The developer does not provide, distribute or support illegal streaming content. The user is fully responsible for the content transmitted through this software and must ensure compliance with all applicable copyright and broadcasting laws in their jurisdiction. The developer assumes no liability for unlawful use of this software.
 
-2025 All rights reserved. Unauthorized use is prohibited.
+2026 All rights reserved. Unauthorized use is prohibited.
